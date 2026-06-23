@@ -42,4 +42,3 @@ steps:
         git commit -m "Update gold/silver rates [skip ci]"
         git push
       fi
-```
