@@ -2,9 +2,12 @@ name: Daily Rate Scraper
 
 on:
   schedule:
-    # Runs everyday at 04:15 UTC (which is 10:00 AM NST)
+    # 10:00 AM NST is 4:15 AM UTC
     - cron: '15 4 * * *'
-  workflow_dispatch: # Allows you to trigger it manually anytime from GitHub UI
+  workflow_dispatch:
+
+permissions:
+  contents: write # Allows the script to push the updated JSON file back to your repo
 
 jobs:
   scrape:
@@ -17,12 +20,20 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-node-version: '3.10'
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run Scraper Script
+    - name: Run Scraper Script and Generate JSON
       run: python scraper.py
+
+    - name: Commit and Push changes
+      run: |
+        git config --global user.name "GitHub Action Scraper"
+        git config --global user.email "actions@github.com"
+        git add rates.json
+        # Only commit if the file actually changed to avoid empty workflow failures
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Update daily gold/silver rates [skip ci]" && git push)
