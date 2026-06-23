@@ -2,7 +2,7 @@ name: Daily Rate Scraper
 
 on:
 schedule:
-- cron: '0 */2 * * *'  # Every 2 hours (UTC)
+- cron: '0 */2 * * *' # Every 2 hours (UTC)
 workflow_dispatch:
 
 permissions:
@@ -12,7 +12,6 @@ jobs:
 scrape:
 runs-on: ubuntu-latest
 
-```
 steps:
   - name: Checkout repository code
     uses: actions/checkout@v4
@@ -44,4 +43,3 @@ steps:
         git push
       fi
 ```
-
