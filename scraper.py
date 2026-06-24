@@ -1,14 +1,39 @@
 import json
 import re
 from pathlib import Path
-from datetime import date
+from datetime import datetime, date
 
 import requests
 from bs4 import BeautifulSoup
 
 
+FILE_PATH = "rates.json"
+
+
+def load_rates():
+    """Load existing rates."""
+    if not Path(FILE_PATH).exists():
+        return []
+
+    try:
+        with open(FILE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        return data if isinstance(data, list) else []
+
+    except Exception:
+        return []
+
+
+def save_rates(data):
+    """Save rates to file."""
+    with open(FILE_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+
 def fetch_rates():
     url = "https://www.fenegosida.org/"
+
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -18,10 +43,12 @@ def fetch_rates():
     }
 
     try:
-        response = requests.get(url, headers=headers, timeout=30)
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=30,
+        )
         response.raise_for_status()
-
-        today = date.today().isoformat()
 
         soup = BeautifulSoup(response.text, "html.parser")
         text_content = soup.get_text(" ", strip=True)
@@ -38,10 +65,35 @@ def fetch_rates():
             re.IGNORECASE,
         )
 
-        gold_price = gold_match.group(1).replace(",", "") if gold_match else None
-        silver_price = silver_match.group(1).replace(",", "") if silver_match else None
+        gold_price = (
+            int(gold_match.group(1).replace(",", ""))
+            if gold_match
+            else None
+        )
 
-        new_data = {
+        silver_price = (
+            int(silver_match.group(1).replace(",", ""))
+            if silver_match
+            else None
+        )
+
+        if gold_price is None and silver_price is None:
+            raise Exception("Could not extract gold and silver prices")
+
+        rates = load_rates()
+
+        today = date.today().isoformat()
+
+        # Prevent duplicate entries for the same day
+        if rates:
+            last_date = rates[-1].get("time_stamp", "")[:10]
+
+            if last_date == today:
+                print(f"Rate already stored for {today}")
+                return
+
+        new_record = {
+            "time_stamp": datetime.utcnow().isoformat(),
             "source": "FENEGOSIDA",
             "currency": "NPR",
             "unit": "1 tola",
@@ -49,53 +101,46 @@ def fetch_rates():
                 "fine_gold_9999": gold_price,
                 "silver": silver_price,
             },
-            "timestamp": today,
         }
 
-        file_path = "rates.json"
+        rates.append(new_record)
 
-        # Load existing data
-        if Path(file_path).exists():
-            with open(file_path, "r", encoding="utf-8") as f:
-                try:
-                    rates = json.load(f)
+        save_rates(rates)
 
-                    if not isinstance(rates, list):
-                        rates = []
-
-                except json.JSONDecodeError:
-                    rates = []
-        else:
-            rates = []
-
-        # Check if today's entry already exists
-        exists = any(
-            item.get("time_stamp") == today
-            for item in rates
+        print(f"Added rate for {today}")
+        print(
+            json.dumps(
+                new_record,
+                indent=4,
+                ensure_ascii=False,
+            )
         )
-
-        if not exists:
-            rates.append(new_data)
-
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(rates, f, ensure_ascii=False, indent=4)
-
-            print(f"Added new record for {today}")
-        else:
-            print(f"Record for {today} already exists")
-
-        print(json.dumps(new_data, indent=4, ensure_ascii=False))
 
     except Exception as e:
         error_data = {
             "error": str(e),
-            "time_stamp": date.today().isoformat(),
+            "time_stamp": datetime.utcnow().isoformat(),
         }
 
-        print(json.dumps(error_data, indent=4))
+        print(
+            json.dumps(
+                error_data,
+                indent=4,
+                ensure_ascii=False,
+            )
+        )
 
-        with open("error.json", "w", encoding="utf-8") as f:
-            json.dump(error_data, f, ensure_ascii=False, indent=4)
+        with open(
+            "error.json",
+            "w",
+            encoding="utf-8",
+        ) as f:
+            json.dump(
+                error_data,
+                f,
+                ensure_ascii=False,
+                indent=4,
+            )
 
 
 if __name__ == "__main__":
